@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PartsTrack - Parts List</title>
+    {% load static %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+</head>
+<body>
+    <div class="main-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">PartsTrack</div>
+                <div class="sidebar-subtitle">Inventory Management</div>
+                <div class="user-profile">
+                    <div class="user-name">{{ user.first_name }} {{ user.last_name }}</div>
+                    <div class="user-email">{{ user.email }}</div>
+                    <span class="user-role-badge">{{ user_role }}</span>
+                </div>
+            </div>
+
+            <ul class="sidebar-menu">
+                <li><a href="{% url 'dashboard' %}"><i class="fas fa-th-large"></i> Dashboard</a></li>
+                <li><a href="{% url 'spare_parts_list' %}" class="active"><i class="fas fa-box"></i> Parts</a></li>
+                <li><a href="{% url 'sales_list' %}"><i class="fas fa-shopping-cart"></i> Sales</a></li>
+                <li><a href="{% url 'employees_list' %}"><i class="fas fa-users"></i> Employees</a></li>
+            </ul>
+
+            <button class="logout-btn" onclick="window.location.href='{% url 'logout' %}'">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">Parts Inventory</h1>
+                <p class="page-subtitle">All spare parts in system</p>
+            </div>
+
+            
+
+            <!-- Parts Table -->
+            <div class="table-responsive" style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #f0f0f0;">
+                            <th style="color: #666; font-weight: 600;">Part Number</th>
+                            <th style="color: #666; font-weight: 600;">Part Name</th>
+                            <th style="color: #666; font-weight: 600;">Category</th>
+                            <th style="color: #666; font-weight: 600;">Quantity</th>
+                            <th style="color: #666; font-weight: 600;">Price</th>
+                            <th style="color: #666; font-weight: 600;">Minimum Stock</th>
+                            <th style="color: #666; font-weight: 600;">Status</th>
+                            {% if user_role == 'employee' %}
+                            <th style="color: #666; font-weight: 600;">Actions</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if parts %}
+                            {% for part in parts %}
+                            <tr>
+                                <td><strong>{{ part.part_number }}</strong></td>
+                                <td>{{ part.part_name }}</td>
+                                <td>{{ part.category }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ part.quantity }}</span>
+                                </td>
+                                <td>${{ part.price }}</td>
+                                <td>{{ part.minimum_stock }}</td>
+                                <td>
+                                    {% if part.quantity == 0 %}
+                                        <span class="badge bg-danger">Out of Stock</span>
+                                    {% elif part.quantity <= part.minimum_stock %}
+                                        <span class="badge bg-warning">Low Stock</span>
+                                    {% else %}
+                                        <span class="badge bg-success">In Stock</span>
+                                    {% endif %}
+                                </td>
+                                {% if user_role == 'employee' %}
+                                <td>
+                                    <a href="{% url 'edit_part' part.id %}" class="btn btn-sm btn-warning" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'delete_part' part.id %}" class="btn btn-sm btn-danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="{% if user_role == 'employee' %}8{% else %}7{% endif %}" style="text-align: center; padding: 40px; color: #999;">
+                                    <i class="fas fa-inbox" style="font-size: 24px;"></i>
+                                    <p style="margin-top: 10px;">No parts found. 
+                                    {% if user_role == 'employee' %}
+                                        
+                                    {% endif %}
+                                    </p>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Summary Card -->
+            <div style="margin-top: 30px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h4 style="color: #333; margin-bottom: 15px;">Summary</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <p style="color: #666;">
+                        <i class="fas fa-cubes" style="color: #2196f3; margin-right: 10px;"></i>
+                        <strong>Total Parts:</strong> {{ total_parts }}
+                    </p>
+                    <p style="color: #666;">
+                        <i class="fas fa-exclamation-triangle" style="color: #ff9800; margin-right: 10px;"></i>
+                        <strong>Low Stock:</strong> {{ low_stock_count }}
+                    </p>
+                    <p style="color: #666;">
+                        <i class="fas fa-times-circle" style="color: #f44336; margin-right: 10px;"></i>
+                        <strong>Out of Stock:</strong> {{ out_of_stock_count }}
+                    </p>
+                    <p style="color: #666;">
+                        <i class="fas fa-dollar-sign" style="color: #4caf50; margin-right: 10px;"></i>
+                        <strong>Stock Value:</strong> ${{ stock_value }}
+                    </p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

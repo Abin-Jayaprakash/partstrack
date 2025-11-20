@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PartsTrack - Employees</title>
+    {% load static %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+</head>
+<body>
+    <div class="main-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">PartsTrack</div>
+                <div class="sidebar-subtitle">Inventory Management</div>
+                <div class="user-profile">
+                    <div class="user-name">{{ user.first_name }} {{ user.last_name }}</div>
+                    <div class="user-email">{{ user.email }}</div>
+                    <span class="user-role-badge">{{ user_role }}</span>
+                </div>
+            </div>
+
+            <ul class="sidebar-menu">
+                <li><a href="{% url 'dashboard' %}"><i class="fas fa-th-large"></i> Dashboard</a></li>
+                <li><a href="{% url 'spare_parts_list' %}"><i class="fas fa-box"></i> Parts</a></li>
+                <li><a href="{% url 'sales_list' %}"><i class="fas fa-shopping-cart"></i> Sales</a></li>
+                <li><a href="{% url 'employees_list' %}" class="active"><i class="fas fa-users"></i> Employees</a></li>
+            </ul>
+
+            <button class="logout-btn" onclick="window.location.href='{% url 'logout' %}'">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">Employees Management</h1>
+                <p class="page-subtitle">View all system employees</p>
+            </div>
+
+            <!-- Add Employee Button -->
+            <div style="margin-bottom: 20px;">
+                <a href="{% url 'add_employee' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Add New Employee
+                </a>
+            </div>
+
+            <!-- Employees Table -->
+            <div class="table-responsive" style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #f0f0f0;">
+                            <th style="color: #666; font-weight: 600;">Employee ID</th>
+                            <th style="color: #666; font-weight: 600;">First Name</th>
+                            <th style="color: #666; font-weight: 600;">Last Name</th>
+                            <th style="color: #666; font-weight: 600;">Email</th>
+                            <th style="color: #666; font-weight: 600;">Mobile Number</th>
+                            <th style="color: #666; font-weight: 600;">Role</th>
+                            <th style="color: #666; font-weight: 600;">Join Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if employees %}
+                            {% for employee in employees %}
+                            <tr>
+                                <td><strong>#{{ forloop.counter }}</strong></td>
+                                <td>{{ employee.first_name }}</td>
+                                <td>{{ employee.last_name }}</td>
+                                <td>{{ employee.email }}</td>
+                                <td>
+                                    {% if employee.userprofile.mobile_number %}
+                                        {{ employee.userprofile.mobile_number }}
+                                    {% else %}
+                                        <span style="color: #999;">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ employee.userprofile.get_role_display }}</span>
+                                </td>
+                                <td>{{ employee.date_joined|date:"M d, Y" }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 40px; color: #999;">
+                                    <i class="fas fa-inbox" style="font-size: 24px;"></i>
+                                    <p style="margin-top: 10px;">No employees found. 
+                                    <a href="{% url 'add_employee' %}">Add your first employee</a>
+                                    </p>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Summary Card -->
+            <div style="margin-top: 30px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h4 style="color: #333; margin-bottom: 15px;">Summary</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <p style="color: #666;">
+                        <i class="fas fa-users" style="color: #2196f3; margin-right: 10px;"></i>
+                        <strong>Total Employees:</strong> {{ total_employees }}
+                    </p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PartsTrack - Employee Created Successfully</title>
+    {% load static %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+</head>
+<body>
+    <div class="main-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">PartsTrack</div>
+                <div class="sidebar-subtitle">Inventory Management</div>
+                <div class="user-profile">
+                    <div class="user-name">{{ user.first_name }} {{ user.last_name }}</div>
+                    <div class="user-email">{{ user.email }}</div>
+                    <span class="user-role-badge">{{ user_role }}</span>
+                </div>
+            </div>
+
+            <ul class="sidebar-menu">
+                <li><a href="{% url 'dashboard' %}"><i class="fas fa-th-large"></i> Dashboard</a></li>
+                <li><a href="{% url 'spare_parts_list' %}"><i class="fas fa-box"></i> Parts</a></li>
+                <li><a href="{% url 'sales_list' %}"><i class="fas fa-shopping-cart"></i> Sales</a></li>
+                <li><a href="{% url 'employees_list' %}" class="active"><i class="fas fa-users"></i> Employees</a></li>
+            </ul>
+
+            <button class="logout-btn" onclick="window.location.href='{% url 'logout' %}'">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">Employee Created Successfully ✓</h1>
+                <p class="page-subtitle">Employee account has been created. Share these credentials below.</p>
+            </div>
+
+            <!-- Success Message -->
+            <div style="max-width: 700px; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 5px solid #4caf50;">
+                
+                <!-- Success Icon -->
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <i class="fas fa-check-circle" style="font-size: 60px; color: #4caf50;"></i>
+                </div>
+
+                <!-- Employee Details -->
+                <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                    <h4 style="color: #333; margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px;">
+                        <i class="fas fa-user"></i> Employee Information
+                    </h4>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="color: #666; font-weight: 600;">First Name:</label>
+                        <p style="color: #333; margin: 5px 0; padding: 10px; background: white; border-radius: 4px;">{{ employee.first_name }}</p>
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="color: #666; font-weight: 600;">Last Name:</label>
+                        <p style="color: #333; margin: 5px 0; padding: 10px; background: white; border-radius: 4px;">{{ employee.last_name }}</p>
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="color: #666; font-weight: 600;">Email:</label>
+                        <p style="color: #333; margin: 5px 0; padding: 10px; background: white; border-radius: 4px;">{{ employee.email }}</p>
+                    </div>
+                </div>
+
+                <!-- Login Credentials -->
+                <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 30px; border-left: 5px solid #ffc107;">
+                    <h4 style="color: #856404; margin-bottom: 20px; border-bottom: 2px solid #ffecb5; padding-bottom: 10px;">
+                        <i class="fas fa-key"></i> Login Credentials
+                    </h4>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="color: #856404; font-weight: 600;">Username:</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" value="{{ username }}" style="flex: 1; padding: 10px; border: 1px solid #ffc107; border-radius: 4px; background: white;" readonly>
+                            <button onclick="copyToClipboard('{{ username }}')" class="btn btn-warning btn-sm" title="Copy Username">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="color: #856404; font-weight: 600;">Password:</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="password" value="{{ password }}" style="flex: 1; padding: 10px; border: 1px solid #ffc107; border-radius: 4px; background: white;" readonly>
+                            <button onclick="copyToClipboard('{{ password }}')" class="btn btn-warning btn-sm" title="Copy Password">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            <button onclick="togglePassword()" class="btn btn-warning btn-sm" title="Show/Hide Password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="background: #fff; padding: 10px; border-radius: 4px; color: #856404; font-size: 12px;">
+                        <i class="fas fa-info-circle"></i> <strong>Important:</strong> Share these credentials with the employee. They can use these to login and change their password.
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="d-flex gap-2" style="justify-content: center;">
+                    <a href="{% url 'employees_list' %}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-users"></i> View All Employees
+                    </a>
+                    <a href="{% url 'add_employee' %}" class="btn btn-success btn-lg">
+                        <i class="fas fa-plus"></i> Add Another Employee
+                    </a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Copied to clipboard!');
+            });
+        }
+
+        function togglePassword() {
+            const passwordField = document.getElementById('password');
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+            } else {
+                passwordField.type = 'password';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>PartsTrack - Admin Dashboard</title>
+    {% load static %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        // Prevent pinch zoom on mobile
+        document.addEventListener('touchmove', function(e) {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, false);
+
+        // Prevent keyboard zoom (Ctrl +/-)
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && (e.key === '+' || e.key === '-' || e.key === '0' || e.key === '=')) {
+                e.preventDefault();
+            }
+        });
+    </script>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">PartsTrack</div>
+                <div class="user-profile">
+                    <div class="user-name">{{ user.first_name }} {{ user.last_name }}</div>
+                    <div class="user-email">{{ user.email }}</div>
+                    <span class="user-role-badge">{{ user_role|upper }}</span>
+                </div>
+            </div>
+
+            <ul class="sidebar-menu">
+                <li><a href="{% url 'admin_dashboard' %}" class="active"><i class="fas fa-th-large"></i> Dashboard</a></li>
+                <li><a href="{% url 'spare_parts_list' %}"><i class="fas fa-box"></i> Parts</a></li>
+                <li><a href="{% url 'admin_analytics' %}"><i class="fas fa-chart-bar"></i> Analytics</a></li>
+                <li><a href="{% url 'sales_list' %}"><i class="fas fa-shopping-cart"></i> Sales</a></li>
+                <li><a href="{% url 'employees_list' %}"><i class="fas fa-users"></i> Employees</a></li>
+            </ul>
+
+            <button class="logout-btn" onclick="window.location.href='{% url 'logout' %}'">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="success-message">
+                        <i class="fas fa-check-circle"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="page-header">
+                <h1 class="page-title">Admin Dashboard</h1>
+                <p class="page-subtitle">Overview of your parts and operations</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>Total Parts</h3>
+                        <div class="stat-value">{{ total_parts }}</div>
+                    </div>
+                    <div class="stat-icon blue">
+                        <i class="fas fa-cubes"></i>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>Low Parts Items</h3>
+                        <div class="stat-value" id="low-stock-count">{{ low_stock_count }}</div>
+                    </div>
+                    <div class="stat-icon orange">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>Out of Parts</h3>
+                        <div class="stat-value" id="out-stock-count">{{ out_of_stock_count }}</div>
+                    </div>
+                    <div class="stat-icon red">
+                        <i class="fas fa-times-circle"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-title">Top Selling Parts</div>
+                    <div class="chart-subtitle">Best performing products by quantity</div>
+                    <div class="chart-wrapper">
+                        <canvas id="sellingChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-title">
+                        Stock Status
+                        <small style="font-size: 12px; color: #999; margin-left: 10px;">
+                            <i class="fas fa-sync"></i> Last updated: <span id="update-time">just now</span>
+                        </small>
+                    </div>
+                    <div class="chart-subtitle">Distribution of inventory levels</div>
+                    <div class="chart-wrapper">
+                        <canvas id="stockChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Low Stock Alert -->
+            <div class="low-stock-section">
+                <div class="alert-header">
+                    <div class="alert-icon">
+                        <i class="fas fa-exclamation-circle"></i>
+                    </div>
+                    <h3>Low Stock Alert</h3>
+                </div>
+                <div>
+                    {% if low_stock_alerts %}
+                        {% for alert in low_stock_alerts %}
+                        <div class="alert-item">
+                            <div class="alert-item-info">
+                                <h4>{{ alert.part_name }}</h4>
+                                <p>{{ alert.supplier.name|default:"Unknown Supplier" }} - {{ alert.category }}</p>
+                            </div>
+                            <div style="text-align: right;">
+                                <div class="stock-badge">Stock: {{ alert.quantity }}</div>
+                                <div class="reorder-info">Reorder at: {{ alert.minimum_stock }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert-item">
+                            <div class="alert-item-info">
+                                <h4>Items that need restocking</h4>
+                                <p>No low stock items at the moment</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Prevent page zoom issues
+        document.addEventListener('wheel', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        let stockChart = null;
+        let sellingChart = null;
+
+        // Function to format time
+        function formatTime(date) {
+            const now = new Date();
+            const diff = now - date;
+            const seconds = Math.floor(diff / 1000);
+            const minutes = Math.floor(seconds / 60);
+            
+            if (minutes < 1) return 'just now';
+            if (minutes === 1) return '1 minute ago';
+            if (minutes < 60) return `${minutes} minutes ago`;
+            
+            const hours = Math.floor(minutes / 60);
+            if (hours === 1) return '1 hour ago';
+            return `${hours} hours ago`;
+        }
+
+        // Fetch and update stock chart data
+        function updateStockChartData() {
+            fetch('{% url "get_stock_status_data" %}')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Stock chart data updated:', data);
+
+                    // Update stat cards
+                    document.getElementById('low-stock-count').textContent = data.low_stock;
+                    document.getElementById('out-stock-count').textContent = data.out_of_stock;
+
+                    // Update pie chart
+                    if (stockChart) {
+                        stockChart.data.datasets[0].data = [data.in_stock, data.low_stock];
+                        stockChart.update('none');
+                    }
+
+                    // Update timestamp
+                    document.getElementById('update-time').textContent = formatTime(new Date());
+                })
+                .catch(error => console.error('Error fetching stock data:', error));
+        }
+
+        // Fetch and update top selling parts chart
+        function updateTopPartsChartData() {
+            fetch('{% url "get_top_parts_data" %}')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Top parts data updated:', data);
+
+                    // Update bar chart
+                    if (sellingChart) {
+                        sellingChart.data.labels = data.labels;
+                        sellingChart.data.datasets[0].data = data.quantities;
+                        sellingChart.update('none');
+                    }
+                })
+                .catch(error => console.error('Error fetching top parts data:', error));
+        }
+
+        // Initialize Selling Chart
+        function initializeSellingChart() {
+            const sellingCtx = document.getElementById('sellingChart').getContext('2d');
+            sellingChart = new Chart(sellingCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Loading...'],
+                    datasets: [{
+                        label: 'Quantity',
+                        data: [0],
+                        backgroundColor: '#2196f3',
+                        borderRadius: 6,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 5 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize Stock Status Chart
+        function initializeStockChart() {
+            const stockCtx = document.getElementById('stockChart').getContext('2d');
+            stockChart = new Chart(stockCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['In Stock', 'Low Stock'],
+                    datasets: [{
+                        data: [{{ in_stock|default:0 }}, {{ low_stock_count|default:0 }}],
+                        backgroundColor: ['#4caf50', '#ff6b6b'],
+                        borderColor: 'white',
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSellingChart();
+            initializeStockChart();
+            
+            // Initial data fetch
+            updateTopPartsChartData();
+            updateStockChartData();
+
+            // Auto-refresh every 5 minutes (300000 ms)
+            setInterval(() => {
+                updateTopPartsChartData();
+                updateStockChartData();
+            }, 5 * 60 * 1000);
+        });
+
+        // Update charts when page becomes visible (tab focus)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                updateTopPartsChartData();
+                updateStockChartData();
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (sellingChart) sellingChart.resize();
+            if (stockChart) stockChart.resize();
+        });
+
+        // Disable browser zoom
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && (e.key === '+' || e.key === '-' || e.key === '0')) {
+                e.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PartsTrack - Parts List</title>
+    {% load static %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+</head>
+<body>
+    <div class="main-container">
+        <!-- Sidebar - Employee Version -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">PartsTrack</div>
+                <div class="sidebar-subtitle">Employee Portal</div>
+                <div class="user-profile">
+                    <div class="user-name">{{ user.first_name }} {{ user.last_name }}</div>
+                    <div class="user-email">{{ user.email }}</div>
+                    <span class="user-role-badge" style="background: #ff9800;">EMPLOYEE</span>
+                </div>
+            </div>
+
+            <!-- Menu for Employees -->
+            <ul class="sidebar-menu">
+                <li><a href="{% url 'employee_dashboard' %}"><i class="fas fa-th-large"></i> Dashboard</a></li>
+                <li><a href="{% url 'employee_parts_list' %}" class="active"><i class="fas fa-box"></i> Parts</a></li>
+            </ul>
+
+            <button class="logout-btn" onclick="window.location.href='{% url 'logout' %}'">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title"><i class="fas fa-box"></i> Parts Inventory</h1>
+                <p class="page-subtitle">Manage and view all available spare parts</p>
+            </div>
+
+            <!-- Add Part Button -->
+            <div style="margin-bottom: 20px;">
+                <a href="{% url 'employee_add_part' %}" class="btn btn-success btn-lg">
+                    <i class="fas fa-plus"></i> Add New Part
+                </a>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px;">
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 5px solid #2196f3;">
+                    <p style="color: #999; margin: 0; font-size: 12px;">Total Parts</p>
+                    <h3 style="color: #2196f3; margin: 10px 0 0 0;">{{ total_parts }}</h3>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 5px solid #ff9800;">
+                    <p style="color: #999; margin: 0; font-size: 12px;">Low Stock</p>
+                    <h3 style="color: #ff9800; margin: 10px 0 0 0;">{{ low_stock_count }}</h3>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 5px solid #4caf50;">
+                    <p style="color: #999; margin: 0; font-size: 12px;">Out of Stock</p>
+                    <h3 style="color: #4caf50; margin: 10px 0 0 0;">{{ out_of_stock_count }}</h3>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 5px solid #9c27b0;">
+                    <p style="color: #999; margin: 0; font-size: 12px;">Stock Value</p>
+                    <h3 style="color: #9c27b0; margin: 10px 0 0 0;">₹{{ stock_value }}</h3>
+                </div>
+            </div>
+
+            <!-- Parts Table -->
+            <div class="table-responsive" style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                {% if parts %}
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #f0f0f0;">
+                            <th style="color: #666; font-weight: 600;">Part Number</th>
+                            <th style="color: #666; font-weight: 600;">Part Name</th>
+                            <th style="color: #666; font-weight: 600;">Category</th>
+                            <th style="color: #666; font-weight: 600;">Quantity</th>
+                            <th style="color: #666; font-weight: 600;">Min Stock</th>
+                            <th style="color: #666; font-weight: 600;">Price</th>
+                            <th style="color: #666; font-weight: 600;">Status</th>
+                            <th style="color: #666; font-weight: 600; text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for part in parts %}
+                        <tr>
+                            <td><strong>{{ part.part_number }}</strong></td>
+                            <td>{{ part.part_name }}</td>
+                            <td>{{ part.category }}</td>
+                            <td>
+                                <span style="padding: 5px 10px; border-radius: 4px; background: #e3f2fd; color: #1976d2;">
+                                    {{ part.quantity }}
+                                </span>
+                            </td>
+                            <td>{{ part.minimum_stock }}</td>
+                            <td>₹{{ part.price }}</td>
+                            <td>
+                                {% if part.quantity == 0 %}
+                                    <span style="color: white; background: #f44336; padding: 5px 10px; border-radius: 4px; font-size: 12px;">Out of Stock</span>
+                                {% elif part.quantity <= part.minimum_stock %}
+                                    <span style="color: white; background: #ff9800; padding: 5px 10px; border-radius: 4px; font-size: 12px;">Low Stock</span>
+                                {% else %}
+                                    <span style="color: white; background: #4caf50; padding: 5px 10px; border-radius: 4px; font-size: 12px;">In Stock</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+                                <div style="display: flex; gap: 5px; justify-content: center;">
+                                    <a href="{% url 'employee_edit_part' part.id %}" class="btn btn-sm btn-warning" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'employee_delete_part' part.id %}" class="btn btn-sm btn-danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div style="text-align: center; padding: 40px; color: #999;">
+                    <i class="fas fa-inbox" style="font-size: 24px;"></i>
+                    <p style="margin-top: 10px;">No parts found in inventory</p>
+                    <p style="margin-top: 10px;">
+                        <a href="{% url 'employee_add_part' %}" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Add New Part
+                        </a>
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Low Stock Alerts -->
+            {% if low_stock_alerts %}
+            <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 30px;">
+                <h4 style="color: #333; margin-bottom: 20px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">
+                    <i class="fas fa-bell" style="color: #ff9800;"></i> Low Stock Alerts
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                    {% for part in low_stock_alerts %}
+                    <div style="background: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; border-radius: 4px;">
+                        <p style="color: #ff9800; font-weight: 600; margin: 0 0 5px 0;">{{ part.part_name }}</p>
+                        <p style="color: #666; margin: 5px 0; font-size: 13px;">Part #: <strong>{{ part.part_number }}</strong></p>
+                        <p style="color: #666; margin: 5px 0 0 0; font-size: 13px;">
+                            Current: <strong>{{ part.quantity }}</strong> | Minimum: {{ part.minimum_stock }}
+                        </p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
