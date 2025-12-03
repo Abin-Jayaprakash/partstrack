@@ -3,12 +3,26 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db import models
 from django.contrib.auth.models import User
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
+from django.core.mail import send_mail
+from django.conf import settings
+from django.db.models import Sum, Count
+from django.views.decorators.http import require_POST
+from django import forms
 from .models import SparePart, UserProfile, Sale
 from .forms import SparePartForm, EmployeeForm
 import uuid
 import json
+import csv
+
+# ---------- NEW: EmployeeUpdateForm ----------
+class EmployeeUpdateForm(forms.ModelForm):
+    mobile_number = forms.CharField(required=False)
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email']
 
 # HOME - REDIRECT TO LOGIN
 def home(request):
@@ -22,10 +36,8 @@ def custom_login(request):
         username_or_email = request.POST.get('username')
         password = request.POST.get('password')
         
-        # Try to authenticate with username first
         user = authenticate(request, username=username_or_email, password=password)
         
-        # If not found, try with email
         if user is None:
             try:
                 user_obj = User.objects.get(email=username_or_email)
@@ -33,22 +45,23 @@ def custom_login(request):
             except User.DoesNotExist:
                 user = None
         
-        if user is not None:
-            # Check if user is staff/admin - auto create UserProfile if missing (ONLY at login)
+        if user is not None and user.is_active:
             if user.is_staff or user.is_superuser:
-                # Try to get existing profile, if not create one with admin role
                 profile, created = UserProfile.objects.get_or_create(user=user)
                 if created or profile.role != 'admin':
                     profile.role = 'admin'
                     profile.save()
             else:
-                # For non-staff users, ensure they have employee role
                 profile, created = UserProfile.objects.get_or_create(user=user)
                 if created or profile.role != 'employee':
                     profile.role = 'employee'
                     profile.save()
             
             login(request, user)
+
+            if hasattr(profile, 'must_change_password') and profile.must_change_password:
+                return redirect('force_password_change')
+
             return redirect('dashboard')
         else:
             return render(request, 'inventory/login.html', {'error': 'Invalid username/email or password'})
@@ -59,40 +72,33 @@ def custom_logout(request):
     logout(request)
     return redirect('login')
 
-# DASHBOARD VIEW - MAIN ENTRY POINT (ROUTES TO CORRECT DASHBOARD)
+# DASHBOARD VIEW
 @login_required(login_url='login')
 def dashboard(request):
-    # Determine role ONLY based on Django's is_staff/is_superuser
     print(f"[DEBUG] dashboard() - User={request.user.username}, is_staff={request.user.is_staff}")
     
     if request.user.is_staff or request.user.is_superuser:
-        # ADMIN - Route to admin dashboard
         print(f"[DEBUG] dashboard() - Redirecting {request.user.username} to admin_dashboard")
         return redirect('admin_dashboard')
     else:
-        # EMPLOYEE - Route to employee dashboard
         print(f"[DEBUG] dashboard() - Redirecting {request.user.username} to employee_dashboard")
         return redirect('employee_dashboard')
 
-# ADMIN DASHBOARD VIEW - ADMIN ONLY
+# ADMIN DASHBOARD
 @login_required(login_url='login')
 def admin_dashboard(request):
     print(f"[DEBUG] admin_dashboard() - User={request.user.username}")
     
-    # VERIFY ADMIN - Redirect if employee tries to access
     if not (request.user.is_staff or request.user.is_superuser):
         print(f"[DEBUG] admin_dashboard() - User {request.user.username} is not admin, redirecting to employee_dashboard")
         return redirect('employee_dashboard')
     
-    # Set role based on is_staff (DO NOT update UserProfile here)
     user_role = 'admin'
     
-    # ADMIN DASHBOARD DATA
     parts = SparePart.objects.all()
     low_stock_parts = parts.filter(quantity__lte=models.F('minimum_stock'))
     out_of_stock_parts = parts.filter(quantity=0)
     
-    # Calculate totals
     total_parts = parts.count()
     low_stock_count = low_stock_parts.count()
     out_of_stock_count = out_of_stock_parts.count()
@@ -100,7 +106,6 @@ def admin_dashboard(request):
     sales_count = Sale.objects.count()
     sales_revenue = sum(s.total_price for s in Sale.objects.all())
     
-    # Stock status for pie chart
     in_stock = parts.filter(quantity__gt=models.F('minimum_stock')).count()
     
     context = {
@@ -117,32 +122,26 @@ def admin_dashboard(request):
     }
     return render(request, 'inventory/admin_dashboard.html', context)
 
-# EMPLOYEE DASHBOARD VIEW - EMPLOYEE ONLY
+# EMPLOYEE DASHBOARD
 @login_required(login_url='login')
 def employee_dashboard(request):
     print(f"[DEBUG] employee_dashboard() - User={request.user.username}")
     
-    # VERIFY EMPLOYEE - Redirect if admin tries to access
     if request.user.is_staff or request.user.is_superuser:
         print(f"[DEBUG] employee_dashboard() - User {request.user.username} is admin, redirecting to admin_dashboard")
         return redirect('admin_dashboard')
     
-    # Set role based on is_staff (DO NOT update UserProfile here)
     user_role = 'employee'
     
-    # EMPLOYEE DASHBOARD DATA
     parts = SparePart.objects.all()
     low_stock_parts = parts.filter(quantity__lte=models.F('minimum_stock'))
     
-    # Stock status for initial render
     in_stock = parts.filter(quantity__gt=models.F('minimum_stock')).count()
     out_of_stock = parts.filter(quantity=0).count()
     
-    # Calculate totals
     total_parts = parts.count()
     low_stock_count = low_stock_parts.count()
     
-    # Get sales info
     sales = Sale.objects.all()
     total_sales = sales.count()
     total_revenue = sum(s.total_price for s in sales)
@@ -159,62 +158,101 @@ def employee_dashboard(request):
     }
     return render(request, 'inventory/employee_dashboard.html', context)
 
-# API - Get Stock Status Data for Chart (AJAX)
+# API - Stock Status
 @login_required(login_url='login')
 def get_stock_status_data(request):
-    """API endpoint to get stock status data for chart refresh"""
-    parts = SparePart.objects.all()
-    
-    # Stock Status Distribution
-    in_stock = parts.filter(quantity__gt=models.F('minimum_stock')).count()
-    low_stock = parts.filter(quantity__lte=models.F('minimum_stock'), quantity__gt=0).count()
-    out_of_stock = parts.filter(quantity=0).count()
-    
-    data = {
-        'in_stock': in_stock,
-        'low_stock': low_stock,
-        'out_of_stock': out_of_stock,
-        'total': in_stock + low_stock + out_of_stock,
-        'timestamp': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'success': True
-    }
-    
-    return JsonResponse(data)
+    try:
+        parts = SparePart.objects.all()
+        
+        in_stock = parts.filter(quantity__gt=models.F('minimum_stock')).count()
+        low_stock = parts.filter(quantity__lte=models.F('minimum_stock'), quantity__gt=0).count()
+        out_of_stock = parts.filter(quantity=0).count()
+        
+        data = {
+            'in_stock': in_stock,
+            'low_stock': low_stock,
+            'out_of_stock': out_of_stock,
+            'total': in_stock + low_stock + out_of_stock,
+            'timestamp': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'success': True
+        }
+        
+        print(f"[DEBUG] get_stock_status_data() - Returning: {data}")
+        return JsonResponse(data)
+    except Exception as e:
+        print(f"[ERROR] get_stock_status_data: {str(e)}")
+        return JsonResponse({'error': str(e), 'success': False}, status=500)
 
-# API - Get Top Selling Parts Data (AJAX)
+# API - Top Parts
 @login_required(login_url='login')
 def get_top_parts_data(request):
-    """API endpoint to get top parts data for chart refresh - Real time sync with database"""
-    parts = SparePart.objects.all().order_by('-quantity')[:5]
+    print(f"\n[DEBUG] get_top_parts_data() called")
     
-    data = {
-        'labels': [p.part_name for p in parts],
-        'quantities': [p.quantity for p in parts],
-        'categories': [p.category for p in parts],
-        'timestamp': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'success': True
-    }
-    
-    return JsonResponse(data)
+    try:
+        sale_count = Sale.objects.count()
+        print(f"[DEBUG] Total sales in database: {sale_count}")
+        
+        if sale_count > 0:
+            first_sale = Sale.objects.first()
+            print(f"[DEBUG] First sale object: {first_sale}")
+            print(f"[DEBUG] First sale __dict__: {first_sale.__dict__}")
+        
+        try:
+            top_parts = Sale.objects.values('part__part_name').annotate(
+                total_quantity=Sum('quantity_sold')
+            ).order_by('-total_quantity')[:5]
+            
+            if top_parts.exists():
+                labels = [item['part__part_name'] for item in top_parts]
+                quantities = [item['total_quantity'] for item in top_parts]
+                print(f"[DEBUG] Success with part__part_name - Labels: {labels}")
+            else:
+                raise ValueError("No data with part__part_name")
+                
+        except Exception as e1:
+            print(f"[DEBUG] Attempt 1 failed: {e1}, using fallback")
+            fallback_parts = SparePart.objects.all().order_by('-quantity')[:5]
+            labels = [p.part_name for p in fallback_parts]
+            quantities = [p.quantity for p in fallback_parts]
+            print(f"[DEBUG] Using fallback - Labels: {labels}, Quantities: {quantities}")
+        
+        data = {
+            'labels': labels if labels else ['No data'],
+            'quantities': quantities if quantities else [0],
+            'timestamp': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'success': True
+        }
+        
+        print(f"[DEBUG] Final response: {data}\n")
+        return JsonResponse(data)
+        
+    except Exception as e:
+        print(f"\n[ERROR] get_top_parts_data: {str(e)}")
+        import traceback
+        print(f"[ERROR] Traceback:\n{traceback.format_exc()}\n")
+        
+        return JsonResponse({
+            'error': str(e), 
+            'labels': ['Error'], 
+            'quantities': [0],
+            'success': False
+        }, status=500)
 
-# EMPLOYEE PARTS LIST - WITHOUT PROFILE UPDATE
+# EMPLOYEE PARTS LIST
 @login_required(login_url='login')
 def employee_parts_list(request):
     print(f"[DEBUG] employee_parts_list() - User={request.user.username}, is_staff={request.user.is_staff}")
     
-    # Verify user is employee - redirect admin to admin parts list
     if request.user.is_staff or request.user.is_superuser:
         print(f"[DEBUG] employee_parts_list() - User {request.user.username} is admin, redirecting to spare_parts_list")
         return redirect('spare_parts_list')
     
     user_role = 'employee'
     
-    # Get all parts - with CRUD access
     parts = SparePart.objects.all()
     low_stock_parts = parts.filter(quantity__lte=models.F('minimum_stock'))
     out_of_stock_parts = parts.filter(quantity=0)
     
-    # Calculate totals
     total_parts = parts.count()
     low_stock_count = low_stock_parts.count()
     out_of_stock_count = out_of_stock_parts.count()
@@ -232,26 +270,23 @@ def employee_parts_list(request):
     }
     return render(request, 'inventory/employee_parts_list.html', context)
 
-# EMPLOYEE ADD PART - CREATE (REDIRECTS TO EMPLOYEE PARTS LIST)
+# EMPLOYEE ADD PART
 @login_required(login_url='login')
 def employee_add_part(request):
     print(f"[DEBUG] employee_add_part() - User={request.user.username}, is_staff={request.user.is_staff}, method={request.method}")
     
-    # Verify user is employee - redirect admin
     if request.user.is_staff or request.user.is_superuser:
         print(f"[DEBUG] employee_add_part() - User {request.user.username} is admin, redirecting to add_part")
         return redirect('add_part')
     
     user_role = 'employee'
     
-    # Employee can add parts
     if request.method == 'POST':
         form = SparePartForm(request.POST)
         if form.is_valid():
             print(f"[DEBUG] employee_add_part() - Form valid for user {request.user.username}, saving part")
             form.save()
             print(f"[DEBUG] employee_add_part() - Part saved, redirecting {request.user.username} to employee_parts_list")
-            # ✅ REDIRECT TO EMPLOYEE PARTS LIST (NOT spare_parts_list)
             return redirect('employee_parts_list')
         else:
             print(f"[DEBUG] employee_add_part() - Form invalid: {form.errors}")
@@ -264,19 +299,17 @@ def employee_add_part(request):
     }
     return render(request, 'inventory/employee_add_part.html', context)
 
-# EMPLOYEE EDIT PART - UPDATE (REDIRECTS TO EMPLOYEE PARTS LIST)
+# EMPLOYEE EDIT PART
 @login_required(login_url='login')
 def employee_edit_part(request, pk):
     print(f"[DEBUG] employee_edit_part() - User={request.user.username}, pk={pk}, method={request.method}")
     
-    # Verify user is employee - redirect admin
     if request.user.is_staff or request.user.is_superuser:
         print(f"[DEBUG] employee_edit_part() - User {request.user.username} is admin, redirecting to edit_part")
         return redirect('edit_part', pk=pk)
     
     user_role = 'employee'
     
-    # Employee can edit parts
     part = get_object_or_404(SparePart, pk=pk)
     if request.method == 'POST':
         form = SparePartForm(request.POST, instance=part)
@@ -284,7 +317,6 @@ def employee_edit_part(request, pk):
             print(f"[DEBUG] employee_edit_part() - Form valid, saving part {pk}")
             form.save()
             print(f"[DEBUG] employee_edit_part() - Part {pk} updated, redirecting to employee_parts_list")
-            # ✅ REDIRECT TO EMPLOYEE PARTS LIST (NOT spare_parts_list)
             return redirect('employee_parts_list')
         else:
             print(f"[DEBUG] employee_edit_part() - Form invalid: {form.errors}")
@@ -298,25 +330,22 @@ def employee_edit_part(request, pk):
     }
     return render(request, 'inventory/employee_edit_part.html', context)
 
-# EMPLOYEE DELETE PART - DELETE (REDIRECTS TO EMPLOYEE PARTS LIST)
+# EMPLOYEE DELETE PART
 @login_required(login_url='login')
 def employee_delete_part(request, pk):
     print(f"[DEBUG] employee_delete_part() - User={request.user.username}, pk={pk}, method={request.method}")
     
-    # Verify user is employee - redirect admin
     if request.user.is_staff or request.user.is_superuser:
         print(f"[DEBUG] employee_delete_part() - User {request.user.username} is admin, redirecting to delete_part")
         return redirect('delete_part', pk=pk)
     
     user_role = 'employee'
     
-    # Employee can delete parts
     part = get_object_or_404(SparePart, pk=pk)
     if request.method == 'POST':
         print(f"[DEBUG] employee_delete_part() - Deleting part {pk}")
         part.delete()
         print(f"[DEBUG] employee_delete_part() - Part {pk} deleted, redirecting to employee_parts_list")
-        # ✅ REDIRECT TO EMPLOYEE PARTS LIST (NOT spare_parts_list)
         return redirect('employee_parts_list')
     
     context = {
@@ -325,90 +354,30 @@ def employee_delete_part(request, pk):
     }
     return render(request, 'inventory/employee_delete_part.html', context)
 
-# EMPLOYEE ANALYTICS - WITHOUT PROFILE UPDATE
+# EMPLOYEE ANALYTICS - DISABLED
 @login_required(login_url='login')
 def employee_analytics(request):
-    # Verify user is employee
     if request.user.is_staff or request.user.is_superuser:
         return redirect('admin_analytics')
-    
-    user_role = 'employee'
-    
-    # Get all parts
-    parts = SparePart.objects.all()
-    
-    # Stock Status Distribution (for Pie Chart)
-    in_stock = parts.filter(quantity__gt=models.F('minimum_stock')).count()
-    low_stock = parts.filter(quantity__lte=models.F('minimum_stock'), quantity__gt=0).count()
-    out_of_stock = parts.filter(quantity=0).count()
-    
-    # Top 5 Parts by Quantity (for Bar Chart)
-    top_parts = parts.order_by('-quantity')[:5]
-    top_parts_data = {
-        'labels': [p.part_name for p in top_parts],
-        'quantities': [p.quantity for p in top_parts],
-    }
-    
-    # Category Distribution (for Donut Chart)
-    categories = parts.values('category').annotate(count=models.Count('id'))
-    category_data = {
-        'labels': [c['category'] for c in categories],
-        'counts': [c['count'] for c in categories],
-    }
-    
-    # Stock Value by Category
-    category_value = parts.values('category').annotate(
-        total_value=models.Sum(models.F('quantity') * models.F('price'), output_field=models.DecimalField())
-    ).order_by('-total_value')
-    
-    # Calculate Analytics Metrics
-    total_parts = parts.count()
-    total_quantity = sum(p.quantity for p in parts)
-    total_stock_value = sum(p.quantity * p.price for p in parts)
-    avg_stock_per_part = total_quantity / total_parts if total_parts > 0 else 0
-    
-    context = {
-        'user_role': user_role,
-        # Stock Status
-        'in_stock': in_stock,
-        'low_stock': low_stock,
-        'out_of_stock': out_of_stock,
-        'total_parts': total_parts,
-        # Charts Data (JSON)
-        'top_parts_json': json.dumps(top_parts_data),
-        'category_data_json': json.dumps(category_data),
-        # Metrics
-        'total_quantity': total_quantity,
-        'total_stock_value': f"{total_stock_value:.2f}",
-        'avg_stock_per_part': f"{avg_stock_per_part:.2f}",
-        # Category Value
-        'category_value': category_value,
-    }
-    return render(request, 'inventory/employee_analytics.html', context)
+    return redirect('employee_dashboard')
 
-# ADMIN ANALYTICS - WITHOUT PROFILE UPDATE
+# ADMIN ANALYTICS
 @login_required(login_url='login')
 def admin_analytics(request):
-    """Analytics dashboard for admin users"""
-    # Verify user is admin - redirect employees
     if not (request.user.is_staff or request.user.is_superuser):
-        return redirect('employee_analytics')
+        return redirect('employee_dashboard')
     
     user_role = 'admin'
     
-    # Get all parts
     parts = SparePart.objects.all()
     
-    # Stock Status Distribution (for Pie Chart)
     in_stock = parts.filter(quantity__gt=models.F('minimum_stock')).count()
     low_stock = parts.filter(quantity__lte=models.F('minimum_stock'), quantity__gt=0).count()
     out_of_stock = parts.filter(quantity=0).count()
     
-    # Calculate totals
     total_parts = parts.count()
     low_stock_count = low_stock
     
-    # Get sales info
     sales = Sale.objects.all()
     total_sales = sales.count()
     total_revenue = sum(s.total_price for s in sales)
@@ -425,21 +394,18 @@ def admin_analytics(request):
     }
     return render(request, 'inventory/admin_analytics.html', context)
 
-# SPARE PARTS LIST - WITHOUT PROFILE UPDATE
+# SPARE PARTS LIST (ADMIN)
 @login_required(login_url='login')
 def spare_parts_list(request):
-    # Determine role ONLY from is_staff (not UserProfile)
     if request.user.is_staff or request.user.is_superuser:
         user_role = 'admin'
     else:
         user_role = 'employee'
     
-    # All users can view parts
     parts = SparePart.objects.all()
     low_stock_parts = parts.filter(quantity__lte=models.F('minimum_stock'))
     out_of_stock_parts = parts.filter(quantity=0)
     
-    # Calculate totals
     total_parts = parts.count()
     low_stock_count = low_stock_parts.count()
     out_of_stock_count = out_of_stock_parts.count()
@@ -456,10 +422,9 @@ def spare_parts_list(request):
     }
     return render(request, 'inventory/parts_list.html', context)
 
-# ADD PART VIEW - WITHOUT PROFILE UPDATE
+# ADD PART (ADMIN)
 @login_required(login_url='login')
 def add_part(request):
-    # Determine role ONLY from is_staff
     if request.user.is_staff or request.user.is_superuser:
         user_role = 'admin'
     else:
@@ -474,10 +439,9 @@ def add_part(request):
         form = SparePartForm()
     return render(request, 'inventory/add_part.html', {'form': form, 'user_role': user_role})
 
-# EDIT PART VIEW - WITHOUT PROFILE UPDATE
+# EDIT PART (ADMIN)
 @login_required(login_url='login')
 def edit_part(request, pk):
-    # Determine role ONLY from is_staff
     if request.user.is_staff or request.user.is_superuser:
         user_role = 'admin'
     else:
@@ -493,10 +457,9 @@ def edit_part(request, pk):
         form = SparePartForm(instance=part)
     return render(request, 'inventory/edit_part.html', {'form': form, 'part': part, 'user_role': user_role})
 
-# DELETE PART VIEW - WITHOUT PROFILE UPDATE
+# DELETE PART (ADMIN)
 @login_required(login_url='login')
 def delete_part(request, pk):
-    # Determine role ONLY from is_staff
     if request.user.is_staff or request.user.is_superuser:
         user_role = 'admin'
     else:
@@ -508,16 +471,63 @@ def delete_part(request, pk):
         return redirect('spare_parts_list')
     return render(request, 'inventory/delete_part.html', {'part': part, 'user_role': user_role})
 
-# EMPLOYEES LIST - WITHOUT PROFILE UPDATE
+# ---------- NEW: EDIT EMPLOYEE ----------
+@login_required(login_url='login')
+def edit_employee(request, user_id):
+    if not (request.user.is_staff or request.user.is_superuser):
+        return redirect('employee_dashboard')
+
+    employee = get_object_or_404(User, id=user_id)
+    profile = employee.userprofile
+
+    if request.method == 'POST':
+        form = EmployeeUpdateForm(request.POST, instance=employee)
+        if form.is_valid():
+            form.save()
+            profile.mobile_number = form.cleaned_data['mobile_number']
+            profile.save()
+            return redirect('employees_list')
+    else:
+        form = EmployeeUpdateForm(
+            instance=employee,
+            initial={'mobile_number': profile.mobile_number}
+        )
+
+    return render(
+        request,
+        'inventory/edit_employee.html',
+        {'form': form, 'employee': employee, 'user_role': 'admin'}
+    )
+
+# DEACTIVATE EMPLOYEE
+@login_required(login_url='login')
+@require_POST
+def deactivate_employee(request, user_id):
+    if not (request.user.is_staff or request.user.is_superuser):
+        return redirect('employee_dashboard')
+
+    employee = get_object_or_404(User, id=user_id)
+
+    if employee.is_superuser:
+        return redirect('employees_list')
+
+    employee.is_active = False
+    employee.save()
+
+    if hasattr(employee, 'userprofile'):
+        employee.userprofile.role = 'inactive'
+        employee.userprofile.save()
+
+    return redirect('employees_list')
+
+# EMPLOYEES LIST
 @login_required(login_url='login')
 def employees_list(request):
-    # Verify user is admin
     if not (request.user.is_staff or request.user.is_superuser):
         return redirect('employee_dashboard')
     
     user_role = 'admin'
     
-    # Get all employees
     employees = User.objects.filter(userprofile__role='employee')
     total_employees = employees.count()
     
@@ -528,16 +538,14 @@ def employees_list(request):
     }
     return render(request, 'inventory/employees_list.html', context)
 
-# SALES LIST - WITHOUT PROFILE UPDATE
+# SALES LIST
 @login_required(login_url='login')
 def sales_list(request):
-    # Verify user is admin
     if not (request.user.is_staff or request.user.is_superuser):
         return redirect('employee_dashboard')
     
     user_role = 'admin'
     
-    # Get all sales
     sales = Sale.objects.all()
     total_sales = sales.count()
     total_revenue = sum(s.total_price for s in sales)
@@ -550,10 +558,9 @@ def sales_list(request):
     }
     return render(request, 'inventory/sales_list.html', context)
 
-# ADD EMPLOYEE - WITHOUT PROFILE UPDATE (except when creating new employee)
+# ADD EMPLOYEE
 @login_required(login_url='login')
 def add_employee(request):
-    # Verify user is admin
     if not (request.user.is_staff or request.user.is_superuser):
         return redirect('employee_dashboard')
     
@@ -564,32 +571,46 @@ def add_employee(request):
         if form.is_valid():
             username = form.cleaned_data['username']
             
-            # Check if username already exists
             if User.objects.filter(username=username).exists():
                 form.add_error('username', 'Username already exists. Please choose a different username.')
                 return render(request, 'inventory/add_employee.html', {'form': form, 'user_role': user_role})
             
-            # Generate random password
             random_password = str(uuid.uuid4())[:8]
             
-            # Create User - CRITICAL: is_staff=False & is_superuser=False
             user = User.objects.create_user(
                 username=username,
                 email=form.cleaned_data['email'],
                 first_name=form.cleaned_data['first_name'],
                 last_name=form.cleaned_data['last_name'],
                 password=random_password,
-                is_staff=False,        # CRITICAL: Must be False
-                is_superuser=False     # CRITICAL: Must be False
+                is_staff=False,
+                is_superuser=False
             )
             
-            # Create UserProfile with employee role (only for record-keeping)
             user_profile = UserProfile.objects.create(
                 user=user,
-                role='employee'
+                role='employee',
+                must_change_password=True
             )
             user_profile.mobile_number = form.cleaned_data['mobile_number']
             user_profile.save()
+
+            subject = "Your PartsTrack login credentials"
+            message = (
+                f"Hello {user.first_name},\n\n"
+                f"Your PartsTrack employee account has been created.\n\n"
+                f"Login URL: https://cfaaf59d88e441849ad2c53ec6571e4b.vfs.cloud9.us-east-1.amazonaws.com:8080/login/\n"
+                f"Username: {username}\n"
+                f"Password: {random_password}\n\n"
+                f"Please log in and change your password after your first login."
+            )
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [form.cleaned_data['email']],
+                fail_silently=False,
+            )
             
             context = {
                 'employee': user,
@@ -603,3 +624,67 @@ def add_employee(request):
         form = EmployeeForm()
     
     return render(request, 'inventory/add_employee.html', {'form': form, 'user_role': user_role})
+
+# FORCE PASSWORD CHANGE
+@login_required(login_url='login')
+def force_password_change(request):
+    user = request.user
+    profile = UserProfile.objects.get(user=user)
+
+    if request.method == 'POST':
+        new_password = request.POST.get('new_password')
+        confirm_password = request.POST.get('confirm_password')
+
+        if not new_password or not confirm_password:
+            return render(request, 'inventory/force_password_change.html', {
+                'error': 'Please fill in both fields.'
+            })
+
+        if new_password != confirm_password:
+            return render(request, 'inventory/force_password_change.html', {
+                'error': 'Passwords do not match.'
+            })
+
+        user.set_password(new_password)
+        user.save()
+
+        profile.must_change_password = False
+        profile.save()
+
+        logout(request)
+        return redirect('login')
+
+    return render(request, 'inventory/force_password_change.html')
+
+# PURCHASE LIST VIEW
+@login_required(login_url='login')
+def purchase_list(request):
+    if not (request.user.is_staff or request.user.is_superuser):
+        return redirect('employee_dashboard')
+
+    parts = SparePart.objects.filter(
+        models.Q(quantity__lte=models.F('minimum_stock')) | models.Q(quantity=0)
+    )
+
+    if request.method == 'POST':
+        response = HttpResponse(
+            content_type='text/csv',
+            headers={'Content-Disposition': 'attachment; filename="purchase_list.csv"'},
+        )
+        writer = csv.writer(response)
+        writer.writerow(['Part Number', 'Part Name', 'Quantity To Purchase'])
+
+        for part in parts:
+            field_name = f"qty_{part.id}"
+            qty_to_buy = request.POST.get(field_name, '').strip()
+            if qty_to_buy:
+                writer.writerow([part.part_number, part.part_name, qty_to_buy])
+
+        return response
+
+    user_role = 'admin'
+    context = {
+        'parts': parts,
+        'user_role': user_role,
+    }
+    return render(request, 'inventory/purchase_list.html', context)

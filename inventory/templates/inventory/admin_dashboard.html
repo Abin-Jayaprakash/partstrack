@@ -41,7 +41,6 @@
             <ul class="sidebar-menu">
                 <li><a href="{% url 'admin_dashboard' %}" class="active"><i class="fas fa-th-large"></i> Dashboard</a></li>
                 <li><a href="{% url 'spare_parts_list' %}"><i class="fas fa-box"></i> Parts</a></li>
-                <li><a href="{% url 'admin_analytics' %}"><i class="fas fa-chart-bar"></i> Analytics</a></li>
                 <li><a href="{% url 'sales_list' %}"><i class="fas fa-shopping-cart"></i> Sales</a></li>
                 <li><a href="{% url 'employees_list' %}"><i class="fas fa-users"></i> Employees</a></li>
             </ul>
@@ -62,9 +61,15 @@
                 {% endfor %}
             {% endif %}
 
-            <div class="page-header">
-                <h1 class="page-title">Admin Dashboard</h1>
-                <p class="page-subtitle">Overview of your parts and operations</p>
+            <div class="page-header d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="page-title">Admin Dashboard</h1>
+                    <p class="page-subtitle">Overview of your parts and operations</p>
+                </div>
+                <!-- New button: Stock Purchase List -->
+                <a href="{% url 'purchase_list' %}" class="btn btn-primary">
+                    <i class="fas fa-file-download"></i> Stock Purchase List
+                </a>
             </div>
 
             <!-- Stats Cards -->
@@ -293,7 +298,7 @@
             updateTopPartsChartData();
             updateStockChartData();
 
-            // Auto-refresh every 5 minutes (300000 ms)
+            // Auto-refresh every 5 minutes
             setInterval(() => {
                 updateTopPartsChartData();
                 updateStockChartData();

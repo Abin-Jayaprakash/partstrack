@@ -13,7 +13,8 @@ class UserProfile(models.Model):
     role = models.CharField(max_length=50, default='employee', choices=ROLE_CHOICES)
     mobile_number = models.CharField(max_length=15, blank=True, null=True)
     department = models.CharField(max_length=100, blank=True, null=True)
-    
+    must_change_password = models.BooleanField(default=False)  # new field
+
     def __str__(self):
         return f"{self.user.username} - {self.get_role_display()}"
 
