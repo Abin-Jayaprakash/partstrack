@@ -48,6 +48,31 @@
                 </a>
             </div>
 
+            <!-- Search + Filter Form (non-CRUD) -->
+            <form method="get" class="row mb-3">
+              <div class="col-md-6">
+                <input type="text"
+                       name="q"
+                       value="{{ request.GET.q }}"
+                       class="form-control"
+                       placeholder="Search by part name or number">
+              </div>
+              <div class="col-md-4">
+                <select name="stock_filter" class="form-select">
+                  <option value="">All</option>
+                  <option value="low" {% if request.GET.stock_filter == 'low' %}selected{% endif %}>
+                    Low stock
+                  </option>
+                  <option value="out" {% if request.GET.stock_filter == 'out' %}selected{% endif %}>
+                    Out of stock
+                  </option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Apply</button>
+              </div>
+            </form>
+
             <!-- Summary Cards -->
             <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px;">
                 <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 5px solid #2196f3;">
@@ -64,7 +89,7 @@
                 </div>
                 <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 5px solid #9c27b0;">
                     <p style="color: #999; margin: 0; font-size: 12px;">Stock Value</p>
-                    <h3 style="color: #9c27b0; margin: 10px 0 0 0;">₹{{ stock_value }}</h3>
+                    <h3 style="color: #9c27b0; margin: 10px 0 0 0;">€{{ stock_value }}</h3>
                 </div>
             </div>
 
@@ -96,7 +121,7 @@
                                 </span>
                             </td>
                             <td>{{ part.minimum_stock }}</td>
-                            <td>₹{{ part.price }}</td>
+                            <td>€{{ part.price }}</td>
                             <td>
                                 {% if part.quantity == 0 %}
                                     <span style="color: white; background: #f44336; padding: 5px 10px; border-radius: 4px; font-size: 12px;">Out of Stock</span>

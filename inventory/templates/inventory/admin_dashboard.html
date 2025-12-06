@@ -41,7 +41,7 @@
             <ul class="sidebar-menu">
                 <li><a href="{% url 'admin_dashboard' %}" class="active"><i class="fas fa-th-large"></i> Dashboard</a></li>
                 <li><a href="{% url 'spare_parts_list' %}"><i class="fas fa-box"></i> Parts</a></li>
-                <li><a href="{% url 'sales_list' %}"><i class="fas fa-shopping-cart"></i> Sales</a></li>
+                <li><a href="{% url 'sales_list' %}"><i class="fas fa-truck"></i> Suppliers</a></li>
                 <li><a href="{% url 'employees_list' %}"><i class="fas fa-users"></i> Employees</a></li>
             </ul>
 
@@ -185,11 +185,11 @@
             
             if (minutes < 1) return 'just now';
             if (minutes === 1) return '1 minute ago';
-            if (minutes < 60) return `${minutes} minutes ago`;
+            if (minutes < 60) return `€{minutes} minutes ago`;
             
             const hours = Math.floor(minutes / 60);
             if (hours === 1) return '1 hour ago';
-            return `${hours} hours ago`;
+            return `€{hours} hours ago`;
         }
 
         // Fetch and update stock chart data

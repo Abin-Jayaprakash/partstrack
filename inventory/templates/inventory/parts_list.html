@@ -8,6 +8,86 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <style>
+        .search-filter-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .search-bar {
+            position: relative;
+            margin-bottom: 15px;
+        }
+        .search-bar input {
+            padding-left: 40px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            height: 42px;
+        }
+        .search-bar input:focus {
+            border-color: #2196f3;
+            box-shadow: 0 0 0 0.2rem rgba(33, 150, 243, 0.25);
+        }
+        .search-bar i {
+            position: absolute;
+            left: 12px;
+            top: 12px;
+            color: #999;
+        }
+        .filter-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .filter-select {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 14px;
+        }
+        .filter-select:focus {
+            border-color: #2196f3;
+            box-shadow: 0 0 0 0.2rem rgba(33, 150, 243, 0.25);
+        }
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .filter-buttons .btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 6px;
+        }
+        .btn-clear-filters {
+            background: #f44336;
+            color: white;
+            border: none;
+        }
+        .btn-clear-filters:hover {
+            background: #da190b;
+            color: white;
+        }
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .no-results i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        .filter-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+    </style>
 </head>
 <body>
     <div class="main-container">
@@ -26,7 +106,7 @@
             <ul class="sidebar-menu">
                 <li><a href="{% url 'dashboard' %}"><i class="fas fa-th-large"></i> Dashboard</a></li>
                 <li><a href="{% url 'spare_parts_list' %}" class="active"><i class="fas fa-box"></i> Parts</a></li>
-                <li><a href="{% url 'sales_list' %}"><i class="fas fa-shopping-cart"></i> Sales</a></li>
+                <li><a href="{% url 'sales_list' %}"><i class="fas fa-truck"></i> Suppliers</a></li>
                 <li><a href="{% url 'employees_list' %}"><i class="fas fa-users"></i> Employees</a></li>
             </ul>
 
@@ -42,11 +122,60 @@
                 <p class="page-subtitle">All spare parts in system</p>
             </div>
 
-            
+            <!-- Search & Filter Section -->
+            <div class="search-filter-container">
+                <!-- Search Bar -->
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        class="form-control" 
+                        placeholder="Search by part name, number, or category..."
+                    >
+                </div>
+
+                <!-- Filter Row -->
+                <div class="filter-row">
+                    <!-- Category Filter -->
+                    <div>
+                        <label class="filter-label">Category</label>
+                        <select id="categoryFilter" class="form-control filter-select">
+                            <option value="">All Categories</option>
+                            {% for part in parts %}
+                                {% if part.category %}
+                                    <option value="{{ part.category }}">{{ part.category }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Status Filter -->
+                    <div>
+                        <label class="filter-label">Status</label>
+                        <select id="statusFilter" class="form-control filter-select">
+                            <option value="">All Status</option>
+                            <option value="in-stock">In Stock</option>
+                            <option value="low-stock">Low Stock</option>
+                            <option value="out-of-stock">Out of Stock</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Filter Buttons -->
+                <div class="filter-buttons">
+                    <button type="button" class="btn btn-primary" id="applyFilters">
+                        <i class="fas fa-filter"></i> Apply Filters
+                    </button>
+                    <button type="button" class="btn btn-clear-filters" id="clearFilters">
+                        <i class="fas fa-times"></i> Clear All
+                    </button>
+                </div>
+            </div>
 
             <!-- Parts Table -->
             <div class="table-responsive" style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <table class="table table-hover mb-0">
+                <table class="table table-hover mb-0" id="partsTable">
                     <thead>
                         <tr style="border-bottom: 2px solid #f0f0f0;">
                             <th style="color: #666; font-weight: 600;">Part Number</th>
@@ -61,17 +190,18 @@
                             {% endif %}
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="partsTableBody">
                         {% if parts %}
                             {% for part in parts %}
-                            <tr>
+                            <tr class="part-row" data-category="{{ part.category }}" data-part-name="{{ part.part_name }}" data-part-number="{{ part.part_number }}" 
+                                data-status="{% if part.quantity == 0 %}out-of-stock{% elif part.quantity <= part.minimum_stock %}low-stock{% else %}in-stock{% endif %}">
                                 <td><strong>{{ part.part_number }}</strong></td>
                                 <td>{{ part.part_name }}</td>
                                 <td>{{ part.category }}</td>
                                 <td>
                                     <span class="badge bg-info">{{ part.quantity }}</span>
                                 </td>
-                                <td>${{ part.price }}</td>
+                                <td>€{{ part.price }}</td>
                                 <td>{{ part.minimum_stock }}</td>
                                 <td>
                                     {% if part.quantity == 0 %}
@@ -98,16 +228,19 @@
                             <tr>
                                 <td colspan="{% if user_role == 'employee' %}8{% else %}7{% endif %}" style="text-align: center; padding: 40px; color: #999;">
                                     <i class="fas fa-inbox" style="font-size: 24px;"></i>
-                                    <p style="margin-top: 10px;">No parts found. 
-                                    {% if user_role == 'employee' %}
-                                        
-                                    {% endif %}
-                                    </p>
+                                    <p style="margin-top: 10px;">No parts found.</p>
                                 </td>
                             </tr>
                         {% endif %}
                     </tbody>
                 </table>
+                
+                <!-- No Results Message -->
+                <div id="noResults" class="no-results" style="display: none;">
+                    <i class="fas fa-search"></i>
+                    <p><strong>No parts found</strong></p>
+                    <p style="font-size: 14px;">Try adjusting your search or filter criteria</p>
+                </div>
             </div>
 
             <!-- Summary Card -->
@@ -116,19 +249,19 @@
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                     <p style="color: #666;">
                         <i class="fas fa-cubes" style="color: #2196f3; margin-right: 10px;"></i>
-                        <strong>Total Parts:</strong> {{ total_parts }}
+                        <strong>Total Parts:</strong> <span id="totalParts">{{ total_parts }}</span>
                     </p>
                     <p style="color: #666;">
                         <i class="fas fa-exclamation-triangle" style="color: #ff9800; margin-right: 10px;"></i>
-                        <strong>Low Stock:</strong> {{ low_stock_count }}
+                        <strong>Low Stock:</strong> <span id="lowStockCount">{{ low_stock_count }}</span>
                     </p>
                     <p style="color: #666;">
                         <i class="fas fa-times-circle" style="color: #f44336; margin-right: 10px;"></i>
-                        <strong>Out of Stock:</strong> {{ out_of_stock_count }}
+                        <strong>Out of Stock:</strong> <span id="outOfStockCount">{{ out_of_stock_count }}</span>
                     </p>
                     <p style="color: #666;">
                         <i class="fas fa-dollar-sign" style="color: #4caf50; margin-right: 10px;"></i>
-                        <strong>Stock Value:</strong> ${{ stock_value }}
+                        <strong>Stock Value:</strong> €<span id="stockValue">{{ stock_value }}</span>
                     </p>
                 </div>
             </div>
@@ -136,5 +269,131 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Get all unique categories dynamically
+        function loadCategories() {
+            const rows = document.querySelectorAll('.part-row');
+            const categories = new Set();
+            rows.forEach(row => {
+                const category = row.dataset.category;
+                if (category) {
+                    categories.add(category);
+                }
+            });
+            
+            const select = document.getElementById('categoryFilter');
+            const currentValue = select.value;
+            const options = select.querySelectorAll('option:not(:first-child)');
+            options.forEach(opt => opt.remove());
+            
+            const sortedCategories = Array.from(categories).sort();
+            sortedCategories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                select.appendChild(option);
+            });
+            
+            select.value = currentValue;
+        }
+
+        // Filter parts based on search and filters
+        function filterParts() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const statusFilter = document.getElementById('statusFilter').value;
+            
+            const rows = document.querySelectorAll('.part-row');
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                const partName = row.dataset.partName.toLowerCase();
+                const partNumber = row.dataset.partNumber.toLowerCase();
+                const category = row.dataset.category;
+                const status = row.dataset.status;
+                
+                // Search filter
+                const matchesSearch = partName.includes(searchTerm) || partNumber.includes(searchTerm) || category.toLowerCase().includes(searchTerm);
+                
+                // Category filter
+                const matchesCategory = !categoryFilter || category === categoryFilter;
+                
+                // Status filter
+                const matchesStatus = !statusFilter || status === statusFilter;
+                
+                // Show/hide row
+                if (matchesSearch && matchesCategory && matchesStatus) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            
+            // Show/hide no results message
+            const noResults = document.getElementById('noResults');
+            const table = document.querySelector('.table');
+            
+            if (visibleCount === 0) {
+                noResults.style.display = 'block';
+                table.style.display = 'none';
+            } else {
+                noResults.style.display = 'none';
+                table.style.display = 'table';
+            }
+            
+            updateSummary();
+        }
+
+        // Update summary based on visible rows
+        function updateSummary() {
+            const rows = document.querySelectorAll('.part-row:not([style*="display: none"])');
+            
+            let totalParts = rows.length;
+            let lowStock = 0;
+            let outOfStock = 0;
+            let stockValue = 0;
+            
+            rows.forEach(row => {
+                const status = row.dataset.status;
+                const priceText = row.cells[4].textContent.replace('€', '');
+                const quantityText = row.cells[3].textContent.trim();
+                
+                const price = parseFloat(priceText) || 0;
+                const quantity = parseInt(quantityText) || 0;
+                
+                if (status === 'low-stock') lowStock++;
+                if (status === 'out-of-stock') outOfStock++;
+                stockValue += price * quantity;
+            });
+            
+            document.getElementById('totalParts').textContent = totalParts;
+            document.getElementById('lowStockCount').textContent = lowStock;
+            document.getElementById('outOfStockCount').textContent = outOfStock;
+            document.getElementById('stockValue').textContent = stockValue.toFixed(2);
+        }
+
+        // Clear all filters
+        function clearAllFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('categoryFilter').value = '';
+            document.getElementById('statusFilter').value = '';
+            filterParts();
+        }
+
+        // Event listeners
+        document.getElementById('searchInput').addEventListener('keyup', filterParts);
+        document.getElementById('categoryFilter').addEventListener('change', filterParts);
+        document.getElementById('statusFilter').addEventListener('change', filterParts);
+        document.getElementById('applyFilters').addEventListener('click', filterParts);
+        document.getElementById('clearFilters').addEventListener('click', clearAllFilters);
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCategories();
+            updateSummary();
+        });
+    </script>
 </body>
 </html>

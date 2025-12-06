@@ -23,7 +23,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 # Local app
-from .forms import EmployeeForm, SparePartForm, SupplierForm
+from .forms import EmployeeForm, SparePartForm
 from .models import Sale, SparePart, UserProfile, Supplier
 
 
@@ -174,7 +174,7 @@ def employee_dashboard(request):
 
 
 @login_required(login_url="login")
-def get_stock_status_data(request):  # pylint: disable=unused-argument
+def get_stock_status_data(request):
     """Return JSON with counts of in/low/out-of-stock parts."""
     try:
         parts = SparePart.objects.all()
@@ -204,7 +204,7 @@ def get_stock_status_data(request):  # pylint: disable=unused-argument
 
 
 @login_required(login_url="login")
-def get_top_parts_data(request):  # pylint: disable=unused-argument
+def get_top_parts_data(request):
     """Return JSON with top parts (by quantity sold) for charts."""
     try:
         top_parts = (
@@ -531,8 +531,8 @@ def employees_list(request):
 
 
 @login_required(login_url="login")
-def sales_list(request):
-    """List all suppliers (admin-only) – reusing the Sales page."""
+def suppliers_list(request):
+    """List all suppliers (admin-only)."""
     if not (request.user.is_staff or request.user.is_superuser):
         return redirect("employee_dashboard")
 
@@ -544,70 +544,7 @@ def sales_list(request):
         "user_role": "admin",
         "total_suppliers": total_suppliers,
     }
-    return render(request, "inventory/sales_list.html", context)
-
-
-@login_required(login_url="login")
-def add_supplier(request):
-    """Create a new supplier (admin-only)."""
-    if not (request.user.is_staff or request.user.is_superuser):
-        return redirect("employee_dashboard")
-
-    if request.method == "POST":
-        form = SupplierForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect("sales_list")
-    else:
-        form = SupplierForm()
-
-    return render(
-        request,
-        "inventory/add_supplier.html",
-        {"form": form, "user_role": "admin"},
-    )
-
-
-@login_required(login_url="login")
-def edit_supplier(request, supplier_id):
-    """Edit an existing supplier (admin-only)."""
-    if not (request.user.is_staff or request.user.is_superuser):
-        return redirect("employee_dashboard")
-
-    supplier = get_object_or_404(Supplier, id=supplier_id)
-
-    if request.method == "POST":
-        form = SupplierForm(request.POST, instance=supplier)
-        if form.is_valid():
-            form.save()
-            return redirect("sales_list")
-    else:
-        form = SupplierForm(instance=supplier)
-
-    return render(
-        request,
-        "inventory/add_supplier.html",
-        {"form": form, "user_role": "admin"},
-    )
-
-
-@login_required(login_url="login")
-def delete_supplier(request, supplier_id):
-    """Delete a supplier (admin-only)."""
-    if not (request.user.is_staff or request.user.is_superuser):
-        return redirect("employee_dashboard")
-
-    supplier = get_object_or_404(Supplier, id=supplier_id)
-
-    if request.method == "POST":
-        supplier.delete()
-        return redirect("sales_list")
-
-    return render(
-        request,
-        "inventory/confirm_delete_supplier.html",
-        {"supplier": supplier, "user_role": "admin"},
-    )
+    return render(request, "inventory/suppliers_list.html", context)
 
 
 @login_required(login_url="login")
