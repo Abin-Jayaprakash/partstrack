@@ -20,7 +20,7 @@ from django.db.models import Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET, require_http_methods
 
 # Local app
 from .forms import EmployeeForm, SparePartForm, SupplierForm
@@ -38,6 +38,7 @@ class EmployeeUpdateForm(forms.ModelForm):
         fields = ["first_name", "last_name", "email"]
 
 
+@require_GET
 def home(request):
     """Redirect to dashboard if authenticated; otherwise to login."""
     if request.user.is_authenticated:
@@ -45,6 +46,7 @@ def home(request):
     return redirect("login")
 
 
+@require_http_methods(["GET", "POST"])
 def custom_login(request):
     """Login view that accepts username or email and sets user role."""
     if request.method == "POST":
@@ -95,6 +97,7 @@ def custom_login(request):
     return render(request, "inventory/login.html")
 
 
+@require_GET
 def custom_logout(request):
     """Log the user out and redirect to login page."""
     logout(request)
@@ -102,6 +105,7 @@ def custom_logout(request):
 
 
 @login_required(login_url="login")
+@require_GET
 def dashboard(request):
     """Route users to admin or employee dashboards depending on permissions."""
     if request.user.is_staff or request.user.is_superuser:
@@ -110,6 +114,7 @@ def dashboard(request):
 
 
 @login_required(login_url="login")
+@require_GET
 def admin_dashboard(request):
     """Admin dashboard view with summary statistics for parts and sales."""
     if not (request.user.is_staff or request.user.is_superuser):
@@ -143,6 +148,7 @@ def admin_dashboard(request):
 
 
 @login_required(login_url="login")
+@require_GET
 def employee_dashboard(request):
     """Employee dashboard with a simplified summary."""
     if request.user.is_staff or request.user.is_superuser:
@@ -174,6 +180,7 @@ def employee_dashboard(request):
 
 
 @login_required(login_url="login")
+@require_GET
 def get_stock_status_data(request):  # pylint: disable=unused-argument
     """Return JSON with counts of in/low/out-of-stock parts."""
     try:
@@ -204,6 +211,7 @@ def get_stock_status_data(request):  # pylint: disable=unused-argument
 
 
 @login_required(login_url="login")
+@require_GET
 def get_top_parts_data(request):  # pylint: disable=unused-argument
     """Return JSON with top parts (by quantity sold) for charts."""
     try:
@@ -241,6 +249,7 @@ def get_top_parts_data(request):  # pylint: disable=unused-argument
 
 
 @login_required(login_url="login")
+@require_GET
 def employee_parts_list(request):
     """Employee-facing parts listing with optional search and stock filtering."""
     if request.user.is_staff or request.user.is_superuser:
@@ -285,6 +294,7 @@ def employee_parts_list(request):
 
 
 @login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def employee_add_part(request):
     """Allow employee to add a part."""
     if request.user.is_staff or request.user.is_superuser:
@@ -306,6 +316,7 @@ def employee_add_part(request):
 
 
 @login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def employee_edit_part(request, pk):
     """Allow employee to edit a part."""
     if request.user.is_staff or request.user.is_superuser:
@@ -328,6 +339,7 @@ def employee_edit_part(request, pk):
 
 
 @login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def employee_delete_part(request, pk):
     """Allow employee to delete a part."""
     if request.user.is_staff or request.user.is_superuser:
@@ -346,6 +358,7 @@ def employee_delete_part(request, pk):
 
 
 @login_required(login_url="login")
+@require_GET
 def employee_analytics(request):  # pylint: disable=unused-argument
     """Placeholder: redirect employee analytics to appropriate dashboard."""
     if request.user.is_staff or request.user.is_superuser:
@@ -354,6 +367,7 @@ def employee_analytics(request):  # pylint: disable=unused-argument
 
 
 @login_required(login_url="login")
+@require_GET
 def admin_analytics(request):
     """Admin analytics page with stock and sales summary."""
     if not (request.user.is_staff or request.user.is_superuser):
@@ -389,6 +403,7 @@ def admin_analytics(request):
 
 
 @login_required(login_url="login")
+@require_GET
 def spare_parts_list(request):
     """Admin-facing spare parts list."""
     parts = SparePart.objects.all()
@@ -409,6 +424,7 @@ def spare_parts_list(request):
 
 
 @login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def add_part(request):
     """Admin add part view."""
     if request.method == "POST":
@@ -426,6 +442,7 @@ def add_part(request):
 
 
 @login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def edit_part(request, pk):
     """Admin edit part view."""
     part = get_object_or_404(SparePart, pk=pk)
@@ -444,6 +461,7 @@ def edit_part(request, pk):
 
 
 @login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def delete_part(request, pk):
     """Admin delete part view."""
     part = get_object_or_404(SparePart, pk=pk)
@@ -458,6 +476,7 @@ def delete_part(request, pk):
 
 
 @login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def edit_employee(request, user_id):
     """Admin view to edit an employee's User and UserProfile."""
     if not (request.user.is_staff or request.user.is_superuser):
@@ -514,6 +533,7 @@ def deactivate_employee(request, user_id):
 
 
 @login_required(login_url="login")
+@require_GET
 def employees_list(request):
     """List all employees (admin-only)."""
     if not (request.user.is_staff or request.user.is_superuser):
@@ -531,6 +551,7 @@ def employees_list(request):
 
 
 @login_required(login_url="login")
+@require_GET
 def sales_list(request):
     """List all suppliers (admin-only) – reusing the Sales page."""
     if not (request.user.is_staff or request.user.is_superuser):
@@ -548,6 +569,7 @@ def sales_list(request):
 
 
 @login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def add_supplier(request):
     """Create a new supplier (admin-only)."""
     if not (request.user.is_staff or request.user.is_superuser):
@@ -569,6 +591,7 @@ def add_supplier(request):
 
 
 @login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def edit_supplier(request, supplier_id):
     """Edit an existing supplier (admin-only)."""
     if not (request.user.is_staff or request.user.is_superuser):
@@ -592,6 +615,7 @@ def edit_supplier(request, supplier_id):
 
 
 @login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def delete_supplier(request, supplier_id):
     """Delete a supplier (admin-only)."""
     if not (request.user.is_staff or request.user.is_superuser):
@@ -611,6 +635,7 @@ def delete_supplier(request, supplier_id):
 
 
 @login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def add_employee(request):
     """Create a new employee account and send credentials by email."""
     if not (request.user.is_staff or request.user.is_superuser):
@@ -687,6 +712,7 @@ def add_employee(request):
 
 
 @login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def force_password_change(request):
     """Require the logged in user to change their password."""
     user = request.user
@@ -722,6 +748,7 @@ def force_password_change(request):
 
 
 @login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def purchase_list(request):  # pylint: disable=unused-argument
     """Render or export a CSV purchase list for parts under minimum stock."""
     if not (request.user.is_staff or request.user.is_superuser):
