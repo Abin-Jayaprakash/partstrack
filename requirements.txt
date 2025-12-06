@@ -1,0 +1,4 @@
+Django==4.2.25
+asgiref==3.10.0
+sqlparse==0.5.3
+pytz==2022.7.1
