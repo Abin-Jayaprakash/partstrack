@@ -32,7 +32,7 @@ jobs:
           # or: pytest
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@a2b5e3aabf0d2d4c8d0f9a2c0e7bd1c0f1b2c3d
+        uses: SonarSource/sonarcloud-github-action@v2
         with:
           projectBaseDir: .
         env:
