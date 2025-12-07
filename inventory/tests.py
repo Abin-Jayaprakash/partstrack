@@ -120,3 +120,34 @@ class BasicViewTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(SparePart.objects.filter(part_number="E001").exists())
+
+    def test_employee_edit_part_updates_spare_part(self):
+        emp = User.objects.create_user(
+            username="emp2",
+            password="testpass123",
+            is_staff=False,
+        )
+        self.client.login(username="emp2", password="testpass123")
+
+        part = SparePart.objects.create(
+            part_number="E002",
+            part_name="Old Emp Name",
+            quantity=4,
+            price=40,
+            minimum_stock=1,
+        )
+
+        response = self.client.post(
+            reverse("employee_edit_part", args=[part.pk]),
+            {
+                "part_number": "E002",
+                "part_name": "New Emp Name",
+                "quantity": 4,
+                "price": 40,
+                "minimum_stock": 1,
+            },
+        )
+
+        part.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(part.part_name, "New Emp Name")
