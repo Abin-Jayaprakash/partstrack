@@ -41,9 +41,6 @@ class EmployeeUpdateForm(forms.ModelForm):
 @require_GET
 def home(request):
     """Redirect to dashboard if authenticated; otherwise to login."""
-    # TEMP for EB debugging: force an error so we can see if Django handles requests
-    1 / 0
-
     if request.user.is_authenticated:
         return redirect("dashboard")
     return redirect("login")
@@ -288,7 +285,7 @@ def employee_parts_list(request):
         "user_role": "employee",
         "total_parts": total_parts,
         "low_stock_count": low_stock_count,
-        "out_of_stock_count": out_of_stock_count,
+        "out_of_stock_count": out_of_stock_parts.count(),
         "stock_value": f"{stock_value:.2f}",
         "low_stock_alerts": low_stock_parts[:5],
         "is_employee": True,
