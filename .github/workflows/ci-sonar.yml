@@ -25,6 +25,7 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
           pip install pylint
+          pip install coverage
 
       - name: Run pylint
         run: |
