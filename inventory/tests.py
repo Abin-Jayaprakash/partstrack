@@ -10,16 +10,23 @@ class BasicViewTests(TestCase):
         response = self.client.get(reverse("login"))
         self.assertEqual(response.status_code, 200)
 
-    def test_home_page_loads_or_redirects(self):
+    def test_home_redirects_anonymous_to_login(self):
         response = self.client.get(reverse("home"))
-        self.assertIn(response.status_code, [200, 302])
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login", response.url)
+
+    def test_home_redirects_authenticated_to_dashboard(self):
+        user = User.objects.create_user(username="u1", password="pass123")
+        self.client.login(username="u1", password="pass123")
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/dashboard", response.url)
 
     def test_dashboard_loads_or_redirects(self):
         response = self.client.get(reverse("dashboard"))
         self.assertIn(response.status_code, [200, 302])
 
     def test_spare_parts_list_requires_login(self):
-        # anonymous should be redirected
         response = self.client.get(reverse("spare_parts_list"))
         self.assertEqual(response.status_code, 302)
 
@@ -183,7 +190,6 @@ class BasicViewTests(TestCase):
         )
         self.client.login(username="admin_chart", password="testpass123")
 
-        # ensure at least one part exists so fallback path has data
         SparePart.objects.create(
             part_number="T1",
             part_name="Top Part",
