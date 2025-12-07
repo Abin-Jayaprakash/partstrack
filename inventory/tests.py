@@ -151,3 +151,51 @@ class BasicViewTests(TestCase):
         part.refresh_from_db()
         self.assertEqual(response.status_code, 302)
         self.assertEqual(part.part_name, "New Emp Name")
+
+    def test_get_stock_status_data_returns_counts(self):
+        admin = User.objects.create_user(
+            username="admin_api",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.login(username="admin_api", password="testpass123")
+
+        SparePart.objects.create(
+            part_number="S1",
+            part_name="In Stock",
+            quantity=10,
+            price=5,
+            minimum_stock=2,
+        )
+
+        response = self.client.get(reverse("get_stock_status_data"))
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["total"], 1)
+
+    def test_get_top_parts_data_uses_sales_or_fallback(self):
+        admin = User.objects.create_user(
+            username="admin_chart",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.login(username="admin_chart", password="testpass123")
+
+        # ensure at least one part exists so fallback path has data
+        SparePart.objects.create(
+            part_number="T1",
+            part_name="Top Part",
+            quantity=7,
+            price=20,
+            minimum_stock=1,
+        )
+
+        response = self.client.get(reverse("get_top_parts_data"))
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertGreaterEqual(len(data["labels"]), 1)
+        self.assertGreaterEqual(len(data["quantities"]), 1)
