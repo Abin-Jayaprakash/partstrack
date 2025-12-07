@@ -22,9 +22,27 @@ class BasicViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/dashboard", response.url)
 
-    def test_dashboard_loads_or_redirects(self):
+    def test_dashboard_redirects_admin_to_admin_dashboard(self):
+        admin = User.objects.create_user(
+            username="admin_dash",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.login(username="admin_dash", password="testpass123")
         response = self.client.get(reverse("dashboard"))
-        self.assertIn(response.status_code, [200, 302])
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin-dashboard", response.url)
+
+    def test_dashboard_redirects_employee_to_employee_dashboard(self):
+        emp = User.objects.create_user(
+            username="emp_dash",
+            password="testpass123",
+            is_staff=False,
+        )
+        self.client.login(username="emp_dash", password="testpass123")
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/employee-dashboard", response.url)
 
     def test_spare_parts_list_requires_login(self):
         response = self.client.get(reverse("spare_parts_list"))
