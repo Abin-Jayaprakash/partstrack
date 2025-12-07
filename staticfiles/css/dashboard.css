@@ -575,3 +575,105 @@ body {
         transition-duration: 0.01ms !important;
     }
 }
+/* ========================================
+   ZOOM & RESPONSIVE FIXES
+   ======================================== */
+
+/* Prevent zoom scaling issues */
+html {
+    touch-action: manipulation;
+}
+
+/* Chart containers - fixed aspect ratio */
+.chart-card canvas {
+    max-height: 400px;
+    max-width: 100%;
+    display: block;
+}
+
+/* Prevent charts from breaking layout on zoom */
+#sellingChart,
+#stockChart {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 400px;
+}
+
+/* Fix stat cards on zoom */
+.stat-card {
+    flex-shrink: 0;
+    min-width: 250px;
+}
+
+/* Maintain page structure at all zoom levels */
+body {
+    min-width: 320px;
+    zoom: 100%;
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/* Sidebar stays fixed on zoom */
+.sidebar {
+    zoom: 1;
+    transform: translateZ(0);
+}
+
+/* Main content scales properly */
+.main-content {
+    zoom: 1;
+    transform: translateZ(0);
+}
+
+/* Stats grid maintains alignment */
+.stats-grid {
+    zoom: 1;
+}
+
+/* Charts grid - better zoom handling */
+.charts-grid {
+    zoom: 1;
+}
+
+.chart-card {
+    overflow: hidden;
+    zoom: 1;
+}
+
+/* Prevent page horizontal scroll on zoom */
+@media (max-width: 100%) {
+    body {
+        width: 100%;
+        overflow-x: hidden;
+    }
+}
+
+/* Responsive zoom levels */
+@media (zoom: 1.5) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Very high zoom levels */
+@media (zoom: 2) {
+    .sidebar {
+        width: 100%;
+        position: relative;
+    }
+    
+    .main-content {
+        margin-left: 0;
+    }
+    
+    .stats-grid,
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
