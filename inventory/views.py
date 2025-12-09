@@ -685,13 +685,18 @@ def add_employee(request):
                 f"Password: {random_password}\n\n"
                 "Please log in and change your password after your first login."
             )
-            send_mail(
-                subject,
-                message,
-                settings.DEFAULT_FROM_EMAIL,
-                [form.cleaned_data.get("email")],
-                fail_silently=False,
-            )
+
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [form.cleaned_data.get("email")],
+                    fail_silently=False,
+                )
+            except Exception:
+                # Ignore email errors so employee creation still works
+                pass
 
             context = {
                 "employee": user,
@@ -709,6 +714,7 @@ def add_employee(request):
         "inventory/add_employee.html",
         {"form": form, "user_role": "admin"},
     )
+
 
 
 @login_required(login_url="login")
