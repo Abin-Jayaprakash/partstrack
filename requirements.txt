@@ -1,7 +1,7 @@
 asgiref==3.10.0
 astroid==3.3.11
 attrs==20.3.0
-aws-cfn-bootstrap==2.0
+aws-cfn-bootstrap==1.4.post31
 awscli==2.30.4
 awscrt==0.27.6
 awsebcli==3.25.3
