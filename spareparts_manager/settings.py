@@ -20,10 +20,8 @@ SECRET_KEY = os.environ.get(
 DEBUG = True  # OK for class project
 
 # IMPORTANT: allow both Cloud9 and EB hosts
-ALLOWED_HOSTS = [
-    "cfaaf59d88e441849ad2c53ec6571e4b.vfs.cloud9.us-east-1.amazonaws.com",
-    "spareparts-env.eba-w4wj3bn2.us-east-1.elasticbeanstalk.com",
-]
+ALLOWED_HOSTS = ['*']
+    
 
 # Application definition
 
