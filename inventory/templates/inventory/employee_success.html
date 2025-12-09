@@ -129,10 +129,13 @@
 
         function togglePassword() {
             const passwordField = document.getElementById('password');
-            if (passwordField.type === 'password') {
-                passwordField.type = 'text';
+            const visibleType = "text";
+            const hiddenType = "password";
+
+            if (passwordField.type === hiddenType) {
+                passwordField.type = visibleType;
             } else {
-                passwordField.type = 'password';
+                passwordField.type = hiddenType;
             }
         }
     </script>
